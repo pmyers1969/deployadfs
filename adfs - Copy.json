@@ -1,0 +1,74 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storagename": {
+      "type": "string",
+      "defaultValue": "pmstorage",
+      "metadata": {
+        "description": "Storage Name"
+      }
+    },
+    "vnet_name": {
+      "type": "string",
+      "defaultValue": "adfs_vnet1",
+      "metadata": {
+        "description": "VNET Name"
+      }
+    }
+                },
+  "variables": {
+    "adfs_vnet1Prefix": "10.0.0.0/16",
+    "adfs_vnet1Subnet1Name": "Subnet-1",
+    "adfs_vnet1Subnet1Prefix": "10.0.0.0/24",
+    "adfs_vnet1Subnet2Name": "Subnet-2",
+    "adfs_vnet1Subnet2Prefix": "10.0.1.0/24"
+  },
+  "resources": [
+    {
+      "name": "[concat(parameters('storagename'), uniqueString(resourceGroup().id))]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2016-01-01",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "Storage",
+      "location": "Australia South East",
+      "tags": {},
+      "properties": {}
+    },
+    {
+      "name": "[parameters('vnet_name')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [],
+      "tags": {
+        "displayName": "[parameters('vnet_name')]"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('adfs_vnet1Prefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('adfs_vnet1Subnet1Name')]",
+            "properties": {
+              "addressPrefix": "[variables('adfs_vnet1Subnet1Prefix')]"
+            }
+          },
+          {
+            "name": "[variables('adfs_vnet1Subnet2Name')]",
+            "properties": {
+              "addressPrefix": "[variables('adfs_vnet1Subnet2Prefix')]"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {}
+
+}
