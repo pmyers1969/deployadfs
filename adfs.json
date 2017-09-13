@@ -19,14 +19,20 @@
     "fe_avsetName": {
       "type": "string",
       "defaultValue":  "fe_avset",
-      "minLength": 1
+      "minLength": 1,
+      "metadata": {
+        "description": "AV Set Front End Name"
+       }
     },
     "be_avsetName": {
       "type": "string",
       "defaultValue": "be_avset",
-      "minLength": 1
-    }
-                },
+      "minLength": 1,
+      "metadata": {
+        "description": "AV Set Back End Name"
+        }
+      }
+    },
   "variables": {
     "adfs_vnet1Prefix": "10.0.0.0/16",
     "adfs_vnet1Subnet1Name": "Subnet-1",
