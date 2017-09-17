@@ -64,10 +64,17 @@
       "defaultValue": "fe_nic",
       "minLength": 1,
       "metadata": { "description": "Front End NIC Interface Prefix" }
+    },
+    "be_networkinterfaceName": {
+      "type": "string",
+      "defaultValue": "be_nic",
+      "minLength": 1,
+      "metadata": { "description": "Back End NIC Interface Prefix" }
     }
   },
   "variables": {
     "lbID": "[resourceId('Microsoft.Network/loadBalancers',parameters('elbName'))]",
+    "lbID2": "[resourceId('Microsoft.Network/loadBalancers',parameters('ilbName'))]",
     "publicIPAddressType": "Dynamic",
     "publicIPAddressID": "[resourceId('Microsoft.Network/publicIPAddresses',parameters('publicIPAddressName'))]",
     "frontEndIPConfigID": "[concat(variables('lbID'),'/frontendIPConfigurations/LoadBalancerFrontEnd')]",
@@ -81,8 +88,9 @@
     "adfs_vnet1Subnet2Prefix": "10.0.1.0/24",
     "fe_networkinterfacesVnetID": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnet_name'))]",
     "fe_networkinterfacesSubnetRef": "[concat(variables('fe_networkinterfacesVnetID'), '/subnets/', variables('adfs_vnet1Subnet1Name'))]",
-    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',parameters('vnet_name'))]",
-    "be_subnetRef": "[concat(variables('vnetID'),'/subnets/',variables ('adfs_vnet1Subnet2Name'))]"
+    "be_networkinterfacesVnetID": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnet_name'))]",
+    "be_networkinterfacesSubnetRef": "[concat(variables('be_networkinterfacesVnetID'), '/subnets/', variables('adfs_vnet1Subnet2Name'))]",
+    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',parameters('vnet_name'))]"
   },
   "resources": [
     {
@@ -293,6 +301,39 @@
       }
     },
     {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('be_networkInterfaceName'), copyindex())]",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "nicLoop",
+        "count": "[variables('numberOfInstances')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnet_name'))]",
+        "[concat('Microsoft.Network/loadBalancers/', parameters('ilbName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig2",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('be_networkinterfacesSubnetRef')]"
+              },
+              "loadBalancerBackendAddressPools": [
+                {
+                  "id": "[concat(variables('lbID2'), '/backendAddressPools/be_BackendPool1')]"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    {
       "apiVersion": "2017-06-01",
       "type": "Microsoft.Network/loadBalancers",
       "name": "[parameters('ilbName')]",
@@ -310,7 +351,7 @@
           {
             "properties": {
               "subnet": {
-                "id": "[variables('be_subnetRef')]"
+                "id": "[variables('be_networkinterfacesSubnetRef')]"
               },
               "privateIPAddress": "10.0.1.100",
               "privateIPAllocationMethod": "Static"
