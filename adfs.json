@@ -16,13 +16,40 @@
         "description": "VNET Name"
       }
     },
+    "elbName": {
+      "type": "string",
+      "defaultValue": "adfs_ELB",
+      "metadata": {
+        "description": "External Load Balancer name"
+      }
+    },
+    "ilbName": {
+      "type": "string",
+      "defaultValue": "adfs_ILB",
+      "metadata": {
+        "description": "Internal Load Balancer name"
+      }
+    },
+    "dnsNameforLBIP": {
+      "type": "string",
+      "metadata": {
+        "description": "DNS for Load Balancer IP"
+      }
+    },
+    "publicIPAddressName": {
+      "type": "string",
+      "defaultValue": "STSPublicIP",
+      "metadata": {
+        "description": "Public IP Name"
+      }
+    },
     "fe_avsetName": {
       "type": "string",
-      "defaultValue":  "fe_avset",
+      "defaultValue": "fe_avset",
       "minLength": 1,
       "metadata": {
         "description": "AV Set Front End Name"
-       }
+      }
     },
     "be_avsetName": {
       "type": "string",
@@ -30,15 +57,40 @@
       "minLength": 1,
       "metadata": {
         "description": "AV Set Back End Name"
-        }
       }
     },
+    "fe_networkinterfacesName": {
+      "type": "string",
+      "defaultValue": "fe_nic",
+      "minLength": 1,
+      "metadata": { "description": "Front End NIC Interface Prefix" }
+    },
+    "be_networkinterfaceName": {
+      "type": "string",
+      "defaultValue": "be_nic",
+      "minLength": 1,
+      "metadata": { "description": "Back End NIC Interface Prefix" }
+    }
+  },
   "variables": {
+    "lbID": "[resourceId('Microsoft.Network/loadBalancers',parameters('elbName'))]",
+    "lbID2": "[resourceId('Microsoft.Network/loadBalancers',parameters('ilbName'))]",
+    "publicIPAddressType": "Dynamic",
+    "publicIPAddressID": "[resourceId('Microsoft.Network/publicIPAddresses',parameters('publicIPAddressName'))]",
+    "frontEndIPConfigID": "[concat(variables('lbID'),'/frontendIPConfigurations/LoadBalancerFrontEnd')]",
+    "lbPoolID": "[concat(variables('lbID'),'/backendAddressPools/BackendPool1')]",
+    "lbProbeID": "[concat(variables('lbID'),'/probes/tcpProbe')]",
+    "numberOfInstances": 2,
     "adfs_vnet1Prefix": "10.0.0.0/16",
     "adfs_vnet1Subnet1Name": "Subnet-1",
     "adfs_vnet1Subnet1Prefix": "10.0.0.0/24",
     "adfs_vnet1Subnet2Name": "Subnet-2",
-    "adfs_vnet1Subnet2Prefix": "10.0.1.0/24"
+    "adfs_vnet1Subnet2Prefix": "10.0.1.0/24",
+    "fe_networkinterfacesVnetID": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnet_name'))]",
+    "fe_networkinterfacesSubnetRef": "[concat(variables('fe_networkinterfacesVnetID'), '/subnets/', variables('adfs_vnet1Subnet1Name'))]",
+    "be_networkinterfacesVnetID": "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnet_name'))]",
+    "be_networkinterfacesSubnetRef": "[concat(variables('be_networkinterfacesVnetID'), '/subnets/', variables('adfs_vnet1Subnet2Name'))]",
+    "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',parameters('vnet_name'))]"
   },
   "resources": [
     {
@@ -88,8 +140,8 @@
       "name": "[parameters('fe_avsetName')]",
       "type": "Microsoft.Compute/availabilitySets",
       "location": "[resourceGroup().location]",
-      "apiVersion": "2015-06-15",
-      "dependsOn": [ ],
+      "apiVersion": "2016-04-30-preview",
+      "dependsOn": [],
       "tags": {
         "displayName": "fe_avset"
       },
@@ -102,14 +154,242 @@
       "name": "[parameters('be_avsetName')]",
       "type": "Microsoft.Compute/availabilitySets",
       "location": "[resourceGroup().location]",
-      "apiVersion": "2015-06-15",
-      "dependsOn": [ ],
+      "apiVersion": "2016-04-30-preview",
+      "dependsOn": [],
       "tags": {
         "displayName": "be_avset"
       },
       "properties": {
         "platformUpdateDomainCount": 1,
         "platformFaultDomainCount": 1
+      }
+    },
+    {
+      "name": "[concat(parameters('fe_networkinterfacesName'),copyIndex())]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2017-06-01",
+      "copy": {
+        "name": "nicloop",
+        "count": "[variables('numberofinstances')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnet_name'))]",
+        "[concat('Microsoft.Network/loadBalancers/', parameters('elbName'))]"
+      ],
+      "tags": {
+        "displayName": "[concat(parameters('fe_networkinterfacesName'),copyIndex())]"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('fe_networkinterfacesSubnetRef')]"
+              },
+              "loadBalancerBackendAddressPools": [
+                {
+                  "id": "[concat(variables('lbID'), '/backendAddressPools/BackendPool1')]"
+                }
+              ],
+              "loadBalancerInboundNatRules": [
+                {
+                  "id": "[concat(variables('lbID'),'/inboundNatRules/RDP-VM', copyindex())]"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2017-06-01",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[parameters('publicIPAddressName')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
+        "dnsSettings": {
+          "domainNameLabel": "[parameters('dnsNameforLBIP')]"
+        }
+      }
+    },
+    {
+      "apiVersion": "2017-06-01",
+      "name": "[parameters('elbName')]",
+      "type": "Microsoft.Network/loadBalancers",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIPAddresses/', parameters('publicIPAddressName'))]"
+      ],
+      "properties": {
+        "frontendIPConfigurations": [
+          {
+            "name": "LoadBalancerFrontEnd",
+            "properties": {
+              "publicIPAddress": {
+                "id": "[variables('publicIPAddressID')]"
+              }
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "BackendPool1"
+          }
+        ],
+        "inboundNatRules": [
+          {
+            "name": "RDP-VM0",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[variables('frontEndIPConfigID')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 50001,
+              "backendPort": 3389,
+              "enableFloatingIP": false
+            }
+          },
+          {
+            "name": "RDP-VM1",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[variables('frontEndIPConfigID')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 50002,
+              "backendPort": 3389,
+              "enableFloatingIP": false
+            }
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "LBRule",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[variables('frontEndIPConfigID')]"
+              },
+              "backendAddressPool": {
+                "id": "[variables('lbPoolID')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 80,
+              "backendPort": 80,
+              "enableFloatingIP": false,
+              "idleTimeoutInMinutes": 5,
+              "probe": {
+                "id": "[variables('lbProbeID')]"
+              }
+            }
+          }
+        ],
+        "probes": [
+          {
+            "name": "tcpProbe",
+            "properties": {
+              "protocol": "Tcp",
+              "port": 80,
+              "intervalInSeconds": 5,
+              "numberOfProbes": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2015-05-01-preview",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[concat(parameters('be_networkInterfaceName'), copyindex())]",
+      "location": "[resourceGroup().location]",
+      "copy": {
+        "name": "nicLoop",
+        "count": "[variables('numberOfInstances')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnet_name'))]",
+        "[concat('Microsoft.Network/loadBalancers/', parameters('ilbName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig2",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('be_networkinterfacesSubnetRef')]"
+              },
+              "loadBalancerBackendAddressPools": [
+                {
+                  "id": "[concat(variables('lbID2'), '/backendAddressPools/be_BackendPool1')]"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    {
+      "apiVersion": "2017-06-01",
+      "type": "Microsoft.Network/loadBalancers",
+      "name": "[parameters('ilbName')]",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        "[variables('vnetID')]"
+      ],
+      "properties": {
+        "backendAddressPools": [
+          {
+            "name": "be_BackendPool1"
+          }
+        ],
+        "frontendIPConfigurations": [
+          {
+            "properties": {
+              "subnet": {
+                "id": "[variables('be_networkinterfacesSubnetRef')]"
+              },
+              "privateIPAddress": "10.0.1.100",
+              "privateIPAllocationMethod": "Static"
+            },
+            "name": "be_LoadBalancerFrontend"
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "name": "be_lbrule",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('ilbName')), '/frontendIpConfigurations/be_LoadBalancerFrontend')]"
+              },
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('ilbName')), '/backendAddressPools/be_BackendPool1')]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('ilbName')), '/probes/be_lbprobe')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 80,
+              "backendPort": 80,
+              "idleTimeoutInMinutes": 5
+            }
+          }
+        ],
+        "probes": [
+          {
+            "properties": {
+              "protocol": "Tcp",
+              "port": 80,
+              "intervalInSeconds": 15,
+              "numberOfProbes": 2
+            },
+            "name": "be_lbprobe"
+          }
+        ]
       }
     }
   ],
