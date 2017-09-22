@@ -3,7 +3,7 @@
 $location = 'Australia Southeast'
 $resourceGroupName = 'rg-pm997'
 $resourceDeploymentName = 'pmadfs-deployment'
-$templatePath = $env:SystemDrive + '\users\paulm\source\repos\deployadfs'
+$templatePath = $env:SystemDrive + '\Users\PaulMyers\source\repos\deployadfs'
 $templateFile = 'adfs.json'
 $template = $templatePath + '\' + $templateFile
 }

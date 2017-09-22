@@ -78,6 +78,7 @@
     "publicIPAddressType": "Dynamic",
     "publicIPAddressID": "[resourceId('Microsoft.Network/publicIPAddresses',parameters('publicIPAddressName'))]",
     "frontEndIPConfigID": "[concat(variables('lbID'),'/frontendIPConfigurations/LoadBalancerFrontEnd')]",
+    "frontEndIPConfigID2": "[concat(variables('lbID2'),'/frontendIPConfigurations/be_LoadBalancerFrontEnd')]",
     "lbPoolID": "[concat(variables('lbID'),'/backendAddressPools/BackendPool1')]",
     "lbProbeID": "[concat(variables('lbID'),'/probes/tcpProbe')]",
     "numberOfInstances": 2,
@@ -345,6 +346,32 @@
         "backendAddressPools": [
           {
             "name": "be_BackendPool1"
+          }
+        ],
+        "inboundNatRules": [
+          {
+            "name": "RDP-BEVM0",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[variables('frontEndIPConfigID2')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 3389,
+              "backendPort": 3389,
+              "enableFloatingIP": false
+            }
+          },
+          {
+            "name": "RDP-BEVM1",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[variables('frontEndIPConfigID2')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 443,
+              "backendPort": 443,
+              "enableFloatingIP": false
+            }
           }
         ],
         "frontendIPConfigurations": [
